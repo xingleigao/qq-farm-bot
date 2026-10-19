@@ -1,4 +1,9 @@
 const nodemailer = require('nodemailer');
+const fetch = require('node-fetch');
+
+const WECHAT_TOKEN_URL = 'https://api.weixin.qq.com/cgi-bin/token';
+const WECHAT_TEMPLATE_MESSAGE_URL = 'https://api.weixin.qq.com/cgi-bin/message/template/send';
+const wechatTokenCache = new Map();
 
 let pushoo = null;
 try {
@@ -124,6 +129,64 @@ async function sendBarkMessage(payload = {}, fetchImpl = require('node-fetch')) 
   }
 }
 
+function splitWechatMessage(message, chunkSize = 20, maxChunks = 8) {
+  const chunks = [];
+  for (const sourceLine of String(message || '').split(/\r?\n/)) {
+    let line = sourceLine;
+    while (line.length > chunkSize) {
+      chunks.push(line.slice(0, chunkSize));
+      line = line.slice(chunkSize);
+    }
+    if (line) chunks.push(line);
+  }
+  return chunks.slice(0, maxChunks);
+}
+
+async function getWechatAccessToken(appId, appSecret, fetchImpl = fetch) {
+  const cacheKey = `${appId}:${appSecret}`;
+  const cached = wechatTokenCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) return cached.token;
+  const response = await fetchImpl(`${WECHAT_TOKEN_URL}?grant_type=client_credential&appid=${encodeURIComponent(appId)}&secret=${encodeURIComponent(appSecret)}`, { method: 'GET', timeout: 10000,
+    headers: { Accept: 'application/json' } });
+  if (!response.ok) throw new Error(`微信 access_token 请求失败 (HTTP ${response.status})`);
+  const result = await response.json();
+  if (result.errcode || !result.access_token) throw new Error(`获取微信 access_token 失败：${result.errmsg || result.errcode || '响应无 token'}`);
+  const token = String(result.access_token);
+  wechatTokenCache.set(cacheKey, { token, expiresAt: Date.now() + Math.max(60, Number(result.expires_in) || 7200) * 1000 });
+  return token;
+}
+
+async function sendWechatTemplateMessage(payload = {}, fetchImpl = fetch) {
+  const appId = assertRequiredText('微信公众号 AppID', payload.appId);
+  const appSecret = assertRequiredText('微信公众号 AppSecret', payload.appSecret);
+  const openId = assertRequiredText('微信公众号 OpenID', payload.openId);
+  const templateId = assertRequiredText('微信公众号模板 ID', payload.templateId);
+  const title = assertRequiredText('通知标题', payload.title);
+  const content = assertRequiredText('通知内容', payload.content);
+  const prefix = String(payload.fieldPrefix || 'message').trim() || 'message';
+  const messageUrl = String(payload.messageUrl || 'https://weixin.qq.com').trim();
+  const data = Object.fromEntries(splitWechatMessage(`${title}\n${content}`).map((value, index) => [
+    `${prefix}${index}`, { value },
+  ]));
+  const cacheKey = `${appId}:${appSecret}`;
+  let token = await getWechatAccessToken(appId, appSecret, fetchImpl);
+  let result;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await fetchImpl(`${WECHAT_TEMPLATE_MESSAGE_URL}?access_token=${encodeURIComponent(token)}`, {
+      method: 'POST', timeout: 10000,
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+      body: JSON.stringify({ touser: openId, template_id: templateId, url: messageUrl, data }),
+    });
+    if (!response.ok) throw new Error(`微信公众号发送请求失败 (HTTP ${response.status})`);
+    result = await response.json();
+    if (![40001, 40014, 42001, 41006].includes(Number(result?.errcode)) || attempt > 0) break;
+    wechatTokenCache.delete(cacheKey);
+    token = await getWechatAccessToken(appId, appSecret, fetchImpl);
+  }
+  if (Number(result?.errcode) !== 0) throw new Error(`微信公众号发送失败：${result?.errmsg || result?.errcode || '未知错误'}`);
+  return { ok: true, code: 'ok', msg: '微信公众号模板消息发送成功', raw: result };
+}
+
 /**
  * 通过 SMTP 发送邮件（用于下线提醒等推送）
  * @param {object} options - 邮件配置
@@ -190,5 +253,6 @@ async function sendSmtpEmail(options = {}) {
 module.exports = {
   sendSmtpEmail,
   sendBarkMessage,
+  sendWechatTemplateMessage,
   sendPushooMessage
 };

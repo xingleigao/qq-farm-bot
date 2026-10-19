@@ -9,12 +9,13 @@ import { useAccountStore } from '@/stores/account'
 import { defaultNotificationTemplates, insertTemplateVariable, previewCropNotification, templateVariables, unknownTemplateVariables } from '@/utils/notification-template'
 
 defineProps<{ saving: boolean, testing: boolean, showSave?: boolean }>()
-const emit = defineEmits<{ test: [channel?: 'smtp' | 'bark', event?: NotificationEvent], save: [] }>()
+const emit = defineEmits<{ test: [channel?: 'smtp' | 'bark' | 'wechat', event?: NotificationEvent], save: [] }>()
 const config = defineModel<OfflineConfig>('config', { required: true })
 const accountStore = useAccountStore()
-const expandedChannels = ref({ smtp: false, bark: false })
+const expandedChannels = ref({ smtp: false, bark: false, wechat: false })
 watch(() => config.value.smtpEnabled, enabled => expandedChannels.value.smtp = !!enabled, { immediate: true })
 watch(() => config.value.barkEnabled, enabled => expandedChannels.value.bark = !!enabled, { immediate: true })
+watch(() => config.value.wechatEnabled, enabled => expandedChannels.value.wechat = !!enabled, { immediate: true })
 const barkLevels = [
   { value: 'passive', label: '被动通知' },
   { value: 'active', label: '普通通知' },
@@ -52,7 +53,8 @@ const preview = computed(() => activeEvent.value === 'account_offline'
   : previewCropNotification(activeEvent.value, config.value.templates))
 const unknownVariables = computed(() => activeEvent.value === 'account_offline' ? [] : unknownTemplateVariables(`${title.value}\n${content.value}`))
 const testEnabled = computed(() => (config.value.smtpEnabled && config.value.events[activeEvent.value].includes('smtp'))
-  || (config.value.barkEnabled && !!config.value.barkTestKey?.trim() && config.value.events[activeEvent.value].includes('bark')))
+  || (config.value.barkEnabled && !!config.value.barkTestKey?.trim() && config.value.events[activeEvent.value].includes('bark'))
+  || (config.value.wechatEnabled && config.value.events[activeEvent.value].includes('wechat')))
 
 function variableToken(variable: string) {
   return `{${variable}}`
@@ -103,7 +105,7 @@ function navigateEvents(event: KeyboardEvent, index: number) {
     <section>
       <div class="notification-section-heading">
         <h4><span class="i-carbon-send" aria-hidden="true" />推送渠道</h4>
-        <span>{{ Number(config.smtpEnabled) + Number(config.barkEnabled) }} / 2 已启用</span>
+        <span>{{ Number(config.smtpEnabled) + Number(config.barkEnabled) + Number(config.wechatEnabled) }} / 3 已启用</span>
       </div>
       <div class="notification-channels">
         <article class="notification-channel" :class="{ 'notification-channel--enabled': config.smtpEnabled }">
@@ -130,6 +132,35 @@ function navigateEvents(event: KeyboardEvent, index: number) {
               <span class="notification-channel-status" :class="{ 'is-enabled': config.smtpEnabled }">{{ config.smtpEnabled ? '已启用' : '未启用' }}</span>
               <BaseButton v-if="config.smtpEnabled" variant="secondary" size="sm" :loading="testing" :disabled="saving || testing" @click="emit('test', 'smtp')">
                 <div class="i-carbon-send mr-1" />测试邮件
+              </BaseButton>
+            </footer>
+          </div>
+        </article>
+        <article class="notification-channel notification-channel--wechat" :class="{ 'notification-channel--enabled': config.wechatEnabled }">
+          <header class="notification-channel-heading">
+            <span class="notification-channel-icon i-carbon-chat" aria-hidden="true" />
+            <div class="notification-channel-title">
+              <h5>微信公众号</h5><span class="notification-channel-status" :class="{ 'is-enabled': config.wechatEnabled }">{{ config.wechatEnabled ? '已启用 · 模板消息' : '未启用 · 模板消息' }}</span>
+            </div>
+            <BaseSwitch v-model="config.wechatEnabled" aria-label="启用微信公众号通知" />
+            <button type="button" class="notification-channel-expand" :aria-expanded="expandedChannels.wechat" aria-controls="notification-wechat-config" @click="expandedChannels.wechat = !expandedChannels.wechat">
+              配置<span :class="expandedChannels.wechat ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'" aria-hidden="true" />
+            </button>
+          </header>
+          <div v-show="expandedChannels.wechat" id="notification-wechat-config">
+            <div class="notification-channel-body grid gap-3 sm:grid-cols-2">
+              <BaseInput v-model="config.wechatAppId" label="AppID" placeholder="wx..." autocomplete="off" />
+              <BaseInput v-model="config.wechatAppSecret" label="AppSecret" type="password" default-visible autocomplete="off" />
+              <BaseInput v-model="config.wechatOpenId" label="OpenID" placeholder="o..." autocomplete="off" />
+              <BaseInput v-model="config.wechatTemplateId" label="模板 ID" autocomplete="off" />
+              <BaseInput v-model="config.wechatMessageUrl" label="跳转地址" placeholder="https://weixin.qq.com" />
+              <BaseInput v-model="config.wechatFieldPrefix" label="模板字段前缀" placeholder="message" />
+            </div>
+            <p class="px-4 pt-2 text-xs text-gray-500">模板字段默认使用 `message0` 至 `message7`，与 `test_wechat_bot.py` 保持一致。</p>
+            <footer class="notification-channel-footer">
+              <span class="notification-channel-status" :class="{ 'is-enabled': config.wechatEnabled }">{{ config.wechatEnabled ? '已启用' : '未启用' }}</span>
+              <BaseButton v-if="config.wechatEnabled" variant="secondary" size="sm" :loading="testing" :disabled="saving || testing" @click="emit('test', 'wechat')">
+                <div class="i-carbon-send mr-1" />测试公众号
               </BaseButton>
             </footer>
           </div>
@@ -175,7 +206,7 @@ function navigateEvents(event: KeyboardEvent, index: number) {
       <div role="tablist" aria-label="通知事件" class="notification-event-tabs">
         <button v-for="(event, index) in events" :id="`notification-tab-${event.key}`" :key="event.key" type="button" role="tab" :aria-selected="activeEvent === event.key" :tabindex="activeEvent === event.key ? 0 : -1" aria-controls="notification-event-editor" class="notification-event-tab" @click="activeEvent = event.key" @keydown="navigateEvents($event, index)">
           <span :class="event.icon" aria-hidden="true" />
-          <span>{{ event.label }}<small>{{ config.events[event.key].map(channel => channel === 'smtp' ? '邮件' : channel === 'bark' ? 'Bark' : channel).join(' · ') || '未选择渠道' }}</small></span>
+          <span>{{ event.label }}<small>{{ config.events[event.key].map(channel => channel === 'smtp' ? '邮件' : channel === 'bark' ? 'Bark' : channel === 'wechat' ? '公众号' : channel).join(' · ') || '未选择渠道' }}</small></span>
         </button>
       </div>
       <div id="notification-event-editor" role="tabpanel" :aria-labelledby="`notification-tab-${activeEvent}`">
@@ -183,6 +214,7 @@ function navigateEvents(event: KeyboardEvent, index: number) {
           <span class="notification-routing-label">接收渠道</span>
           <label class="flex items-center gap-2"><input type="checkbox" class="h-4 w-4" :checked="config.events[activeEvent].includes('smtp')" @change="toggleChannel(activeEvent, 'smtp', ($event.target as HTMLInputElement).checked)">邮件<span v-if="!config.smtpEnabled" class="text-xs text-gray-400">未启用</span></label>
           <label class="flex items-center gap-2"><input type="checkbox" class="h-4 w-4" :checked="config.events[activeEvent].includes('bark')" @change="toggleChannel(activeEvent, 'bark', ($event.target as HTMLInputElement).checked)">Bark<span v-if="!config.barkEnabled" class="text-xs text-gray-400">未启用</span></label>
+          <label class="flex items-center gap-2"><input type="checkbox" class="h-4 w-4" :checked="config.events[activeEvent].includes('wechat')" @change="toggleChannel(activeEvent, 'wechat', ($event.target as HTMLInputElement).checked)">公众号<span v-if="!config.wechatEnabled" class="text-xs text-gray-400">未启用</span></label>
           <label class="flex items-center gap-2">Bark 等级<select v-model="config.barkLevels[activeEvent]" class="template-input"><option v-for="level in barkLevels" :key="level.value" :value="level.value">{{ level.label }}</option></select></label>
         </div>
         <div class="notification-editor-layout">

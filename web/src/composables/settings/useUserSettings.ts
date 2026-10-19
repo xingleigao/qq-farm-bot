@@ -236,7 +236,7 @@ export function useUserSettings(showAlert: (message: string, type?: AlertType) =
     }
   }
 
-  async function handleTestOffline(channel?: 'smtp' | 'bark', event?: import('@/utils/notification-template').NotificationEvent) {
+  async function handleTestOffline(channel?: 'smtp' | 'bark' | 'wechat', event?: import('@/utils/notification-template').NotificationEvent) {
     if (offlineTesting.value)
       return
     offlineTesting.value = true

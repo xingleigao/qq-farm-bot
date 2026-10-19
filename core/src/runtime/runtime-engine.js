@@ -4,7 +4,7 @@ const process = require('node:process');
 const { Worker } = require('node:worker_threads');
 const store = require('../models/store');
 const { getRuntimeConfig, updateRuntimeConfig } = require('../config/config');
-const { sendBarkMessage, sendSmtpEmail } = require('../services/push');
+const { sendBarkMessage, sendSmtpEmail, sendWechatTemplateMessage } = require('../services/push');
 const { MiniProgramLoginSession } = require('../services/qrlogin');
 const { createAutoCodeRefreshService } = require('./auto-code-refresh');
 const { createDataProvider } = require('./data-provider');
@@ -80,6 +80,7 @@ function createRuntimeEngine(options = {}) {
         miniProgramLoginSession: MiniProgramLoginSession,
         sendBarkMessage,
         sendSmtpEmail,
+        sendWechatTemplateMessage,
         log,
         addAccountLog,
         getAccounts: store.getAccounts,

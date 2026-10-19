@@ -319,14 +319,15 @@ function registerAdminSettingsRoutes({
       if (templateError) return res.status(400).json({ ok: false, error: templateError });
       const event = body.testEvent || 'account_offline';
       if (!['account_offline', 'friend_crop_forecast', 'friend_crop_mature'].includes(event)) return res.status(400).json({ ok: false, error: '未知通知事件' });
-      if (body.testChannel && !['smtp', 'bark'].includes(body.testChannel)) return res.status(400).json({ ok: false, error: '未知通知渠道' });
-      const channels = body.testChannel === 'smtp' || body.testChannel === 'bark'
-        ? [body.testChannel] : ['smtp', 'bark'];
+      if (body.testChannel && !['smtp', 'bark', 'wechat'].includes(body.testChannel)) return res.status(400).json({ ok: false, error: '未知通知渠道' });
+      const channels = body.testChannel === 'smtp' || body.testChannel === 'bark' || body.testChannel === 'wechat'
+        ? [body.testChannel] : ['smtp', 'bark', 'wechat'];
       // Channel connection tests bypass subscriptions; event tests use the selected subscriptions.
       if (body.testChannel || !body.testEvent) config.events = { ...(config.events || {}), [event]: channels };
       if (body.testChannel) {
         config.smtpEnabled = body.testChannel === 'smtp' && config.smtpEnabled;
         config.barkEnabled = body.testChannel === 'bark' && !!config.barkKey;
+        config.wechatEnabled = body.testChannel === 'wechat';
       }
       const result = await sendOfflineReminderTest(config, account?.name || '测试账号', event, store.getSystemSettings?.());
       if (!result) {

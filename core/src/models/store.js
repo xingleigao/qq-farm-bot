@@ -231,6 +231,13 @@ const DEFAULT_OFFLINE_REMINDER = {
     channel: 'smtp',
     smtpEnabled: false,
     barkEnabled: false,
+    wechatEnabled: false,
+    wechatAppId: '',
+    wechatAppSecret: '',
+    wechatOpenId: '',
+    wechatTemplateId: '',
+    wechatMessageUrl: 'https://weixin.qq.com',
+    wechatFieldPrefix: 'message',
     barkAccountKeys: {},
     reloginUrlMode: 'none',
     endpoint: '',
@@ -601,7 +608,7 @@ function normalizeOfflineReminder(raw) {
     const legacyEndpointChannel = PUSHOO_CHANNELS.has(endpoint.toLowerCase())
         ? endpoint.toLowerCase() : '';
     let channel = rawChannel || legacyEndpointChannel || def.channel;
-    if (channel !== 'smtp' && channel !== 'bark' && !PUSHOO_CHANNELS.has(channel)) channel = def.channel;
+    if (channel !== 'smtp' && channel !== 'bark' && channel !== 'wechat' && !PUSHOO_CHANNELS.has(channel)) channel = def.channel;
 
     const rawReloginUrlMode = input.reloginUrlMode !== undefined && input.reloginUrlMode !== null
         ? String(input.reloginUrlMode).trim().toLowerCase() : def.reloginUrlMode;
@@ -644,6 +651,7 @@ function normalizeOfflineReminder(raw) {
 
     const smtpEnabled = typeof input.smtpEnabled === 'boolean'
         ? input.smtpEnabled : channel === 'smtp' && !!(smtpHost && smtpUser && smtpPass && recipientEmail);
+    const wechatEnabled = input.wechatEnabled === true;
     const barkAccountKeys = Object.fromEntries(Object.entries(input.barkAccountKeys && typeof input.barkAccountKeys === 'object' ? input.barkAccountKeys : {})
         .map(([id, key]) => [id, typeof key === 'string' ? key.trim().slice(0, 256) : '']));
 
@@ -653,6 +661,13 @@ function normalizeOfflineReminder(raw) {
         templates: normalizeNotificationTemplates(input.templates),
         smtpEnabled,
         barkEnabled: input.barkEnabled === true,
+        wechatEnabled,
+        wechatAppId: String(input.wechatAppId || '').trim(),
+        wechatAppSecret: String(input.wechatAppSecret || '').trim(),
+        wechatOpenId: String(input.wechatOpenId || '').trim(),
+        wechatTemplateId: String(input.wechatTemplateId || '').trim(),
+        wechatMessageUrl: String(input.wechatMessageUrl || def.wechatMessageUrl).trim(),
+        wechatFieldPrefix: String(input.wechatFieldPrefix || def.wechatFieldPrefix).trim() || def.wechatFieldPrefix,
         barkAccountKeys,
         barkLevels: require('../config/account-maintenance').normalizeBarkLevels(input.barkLevels),
         reloginUrlMode,

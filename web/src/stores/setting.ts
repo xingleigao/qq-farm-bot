@@ -108,6 +108,13 @@ export interface OfflineConfig {
   events: Record<'account_offline' | 'friend_crop_forecast' | 'friend_crop_mature', string[]>
   smtpEnabled: boolean
   barkEnabled: boolean
+  wechatEnabled: boolean
+  wechatAppId: string
+  wechatAppSecret: string
+  wechatOpenId: string
+  wechatTemplateId: string
+  wechatMessageUrl: string
+  wechatFieldPrefix: string
   barkAccountKeys: Record<string, string>
   barkLevels: Record<import('@/utils/notification-template').NotificationEvent, string>
   barkTestKey?: string
@@ -187,10 +194,17 @@ export interface SettingsState {
 export function createDefaultOfflineReminder(): OfflineConfig {
   return {
     templates: normalizeNotificationTemplates(),
-    events: { account_offline: ['smtp', 'bark'], friend_crop_forecast: ['smtp', 'bark'], friend_crop_mature: ['smtp', 'bark'] },
+    events: { account_offline: ['smtp', 'bark', 'wechat'], friend_crop_forecast: ['smtp', 'bark', 'wechat'], friend_crop_mature: ['smtp', 'bark', 'wechat'] },
     channel: 'smtp',
     smtpEnabled: false,
     barkEnabled: false,
+    wechatEnabled: false,
+    wechatAppId: '',
+    wechatAppSecret: '',
+    wechatOpenId: '',
+    wechatTemplateId: '',
+    wechatMessageUrl: 'https://weixin.qq.com',
+    wechatFieldPrefix: 'message',
     barkAccountKeys: {},
     barkLevels: { account_offline: 'timeSensitive', friend_crop_forecast: 'timeSensitive', friend_crop_mature: 'critical' },
     reloginUrlMode: 'none',

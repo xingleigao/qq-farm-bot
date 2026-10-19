@@ -36,7 +36,7 @@ function normalizeNotificationEvents(input = {}) {
   input = input && typeof input === 'object' ? input : {};
   return Object.fromEntries(['account_offline', 'friend_crop_forecast', 'friend_crop_mature'].map(event => [
     event, [...new Set((Array.isArray(input[event]) ? input[event] : ['smtp', 'bark'])
-      .filter(channel => ['smtp', 'bark'].includes(channel)))],
+      .filter(channel => ['smtp', 'bark', 'wechat'].includes(channel)))],
   ]));
 }
 

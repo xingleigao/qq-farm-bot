@@ -15,6 +15,15 @@ const CHANNELS = {
       url: config.notificationEvent === 'friend_crop_mature' ? config.notificationUrl : undefined,
       level: normalizeBarkLevels(config.barkLevels)[config.notificationEvent || 'account_offline'] }),
   },
+  wechat: {
+    label: '微信公众号',
+    enabled: config => config.wechatEnabled === true && !!(config.wechatAppId && config.wechatAppSecret && config.wechatOpenId && config.wechatTemplateId),
+    send: (config, message, senders) => senders.sendWechatTemplateMessage({
+      appId: config.wechatAppId, appSecret: config.wechatAppSecret, openId: config.wechatOpenId,
+      templateId: config.wechatTemplateId, messageUrl: config.wechatMessageUrl,
+      fieldPrefix: config.wechatFieldPrefix, ...message,
+    }),
+  },
 };
 
 function enabledNotificationChannels(config = {}, event) {
